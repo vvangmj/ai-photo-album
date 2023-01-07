@@ -1,0 +1,305 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+    Generator: "former2"
+Description: ""
+Resources:
+    S3Bucket:
+        Type: "AWS::S3::Bucket"
+        DeletionPolicy: Retain
+        Properties:
+            BucketName: "6998-hw2-b1-new"
+            WebsiteConfiguration: 
+                IndexDocument: "index.html"
+                ErrorDocument: "failed_upload.html"
+
+    S3Bucket2:
+        Type: "AWS::S3::Bucket"
+        DeletionPolicy: Retain
+        Properties:
+            BucketName: "aiphoto-deploy-build-artifact"
+
+    S3Bucket3:
+        Type: "AWS::S3::Bucket"
+        DeletionPolicy: Retain
+        Properties:
+            BucketName: "6998-hw2-b2"
+            NotificationConfiguration: 
+                LambdaConfigurations: 
+                  - 
+                    Event: "s3:ObjectCreated:*"
+                    Filter: 
+                        S3Key: 
+                            Rules: 
+                              - 
+                                Name: "Prefix"
+                                Value: ""
+                              - 
+                                Name: "Suffix"
+                                Value: ""
+                    Function: !Sub "arn:aws:lambda:us-east-1:019820692062:function:index-photos"
+                  - 
+                    Event: "s3:ObjectRemoved:*"
+                    Filter: 
+                        S3Key: 
+                            Rules: 
+                              - 
+                                Name: "Prefix"
+                                Value: ""
+                              - 
+                                Name: "Suffix"
+                                Value: ""
+                    Function: !Sub "arn:aws:lambda:us-east-1:019820692062:function:index-photos"
+                  - 
+                    Event: "s3:ObjectRestore:*"
+                    Filter: 
+                        S3Key: 
+                            Rules: 
+                              - 
+                                Name: "Prefix"
+                                Value: ""
+                              - 
+                                Name: "Suffix"
+                                Value: ""
+                    Function: !Sub "arn:aws:lambda:us-east-1:019820692062:function:index-photos"
+
+    S3Bucket4:
+        Type: "AWS::S3::Bucket"
+        DeletionPolicy: Retain
+        Properties:
+            BucketName: !Sub "codepipeline-us-east-1-671560115112"
+
+    S3Bucket5:
+        Type: "AWS::S3::Bucket"
+        DeletionPolicy: Retain
+        Properties:
+            BucketName: !Sub "cf-templates-ii8h7ebhd6s2-us-east-1"
+            BucketEncryption: 
+                ServerSideEncryptionConfiguration: 
+                  - 
+                    ServerSideEncryptionByDefault: 
+                        SSEAlgorithm: "AES256"
+                    BucketKeyEnabled: false
+
+    ApiGatewayRestApi:
+        Type: "AWS::ApiGateway::RestApi"
+        DeletionPolicy: Retain
+        Properties:
+            Name: "ai photo"
+            ApiKeySourceType: "HEADER"
+            BinaryMediaTypes: 
+              - "image/*"
+            EndpointConfiguration: 
+                Types: 
+                  - "REGIONAL"
+
+    IAMManagedPolicy:
+        Type: "AWS::IAM::ManagedPolicy"
+        DeletionPolicy: Retain
+        Properties:
+            ManagedPolicyName: "LambdaLexV2Policy-hw2"
+            Path: "/"
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": [
+                                "lex:CreateUploadUrl",
+                                "lex:ListBuiltInSlotTypes",
+                                "lex:ListBots",
+                                "lex:ListBuiltInIntents",
+                                "lex:ListImports",
+                                "lex:ListExports"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "VisualEditor1",
+                            "Effect": "Allow",
+                            "Action": "lex:*",
+                            "Resource": [
+                                "arn:aws:lex:us-east-1:019820692062:bot-alias/WIOWP3EEDF/TSTALIASID",
+                                "arn:aws:lex:us-east-1:019820692062:bot/WIOWP3EEDF"
+                            ]
+                        }
+                    ]
+                }
+
+    IAMManagedPolicy2:
+        Type: "AWS::IAM::ManagedPolicy"
+        DeletionPolicy: Retain
+        Properties:
+            ManagedPolicyName: "s3-photo-policy"
+            Path: "/"
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "s3:PutObject",
+                            "Resource": "arn:aws:s3:::6998-hw2-b2/*"
+                        }
+                    ]
+                }
+
+    IAMManagedPolicy3:
+        Type: "AWS::IAM::ManagedPolicy"
+        DeletionPolicy: Retain
+        Properties:
+            ManagedPolicyName: "LambdaFullAccess"
+            Path: "/"
+            PolicyDocument: |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "lambda:*",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+
+    OpenSearchServiceDomain:
+        Type: "AWS::OpenSearchService::Domain"
+        DeletionPolicy: Retain
+        Properties:
+            DomainName: "photos"
+            EngineVersion: "OpenSearch_1.3"
+            ClusterConfig: 
+                DedicatedMasterEnabled: false
+                InstanceCount: 3
+                InstanceType: "t3.small.elasticsearch"
+                ZoneAwarenessEnabled: true
+                ZoneAwarenessConfig: 
+                    AvailabilityZoneCount: 3
+                WarmEnabled: false
+            AccessPolicies:
+                Version: '2012-10-17'
+                Statement:
+                    -
+                        Effect: 'Allow'
+                        Principal:
+                            AWS: '*'
+                        Action: 'es:*'
+                        Resource: 'arn:aws:es:us-east-1:019820692062:domain/photos/*'
+
+            SnapshotOptions: {}
+            EncryptionAtRestOptions: 
+                Enabled: true
+                KmsKeyId: !Sub "arn:aws:kms:us-east-1:019820692062:key/516ec6cc-7d0a-4672-9bd6-21b3a1e52d94"
+            NodeToNodeEncryptionOptions: 
+                Enabled: true
+            AdvancedOptions: 
+                "indices.fielddata.cache.size": "20"
+                "indices.query.bool.max_clause_count": "1024"
+                override_main_response_version: "false"
+                "rest.action.multi.allow_explicit_index": "true"
+            EBSOptions: 
+                EBSEnabled: true
+                VolumeType: "gp3"
+                VolumeSize: 10
+                Iops: 3000
+                Throughput: 125
+            CognitoOptions: 
+                Enabled: false
+            DomainEndpointOptions: 
+                EnforceHTTPS: true
+                TLSSecurityPolicy: "Policy-Min-TLS-1-0-2019-07"
+                CustomEndpointEnabled: false
+            AdvancedSecurityOptions: 
+                Enabled: true
+                InternalUserDatabaseEnabled: false
+        
+
+    IAMRole:
+        Type: "AWS::IAM::Role"
+        DeletionPolicy: Retain
+        Properties:
+            Path: "/service-role/"
+            RoleName: !Sub "index-photos-role-vhbjlg5c"
+            AssumeRolePolicyDocument: |
+                {
+                    "Version":"2012-10-17",
+                    "Statement":[
+                        {
+                            "Effect":"Allow",
+                            "Principal":{
+                                "Service“:"lambda.amazonaws.com"
+                            },
+                            "Action":"sts:AssumeRole"
+                        }
+                    ]
+                }
+
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Sub "arn:aws:iam::019820692062:policy/service-role/AWSLambdaBasicExecutionRole-1941d311-116d-4ac1-8ea7-cd1b44682022"
+              - "arn:aws:iam::aws:policy/AmazonRekognitionFullAccess"
+              - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+              - "arn:aws:iam::aws:policy/AmazonOpenSearchServiceFullAccess"
+
+    IAMRole2:
+        Type: "AWS::IAM::Role"
+        DeletionPolicy: Retain
+        Properties:
+            Path: "/service-role/"
+            RoleName: !Sub "search-photos-role-yw2ly1lk"
+            AssumeRolePolicyDocument: |
+             "{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicy
+              - !Sub "arn:aws:iam::019820692062:policy/service-role/AWSLambdaBasicExecutionRole-000ef87c-851a-43be-857f-da85114354a3"
+              - "arn:aws:iam::aws:policy/AmazonAPIGatewayInvokeFullAccess"
+              - "arn:aws:iam::aws:policy/AmazonOpenSearchServiceFullAccess"
+
+    LambdaFunction:
+        Type: "AWS::Lambda::Function"
+        DeletionPolicy: Retain
+        Properties:
+            Description: ""
+            FunctionName: !Sub "search-photos"
+            Handler: "lambda_function.lambda_handler"
+            Architectures: 
+              - "x86_64"
+            Code: 
+                S3Bucket: "prod-iad-c1-djusa-tasks"
+                S3Key: !Sub "/snapshots/019820692062/search-photos-412f17da-7f8c-489b-90f5-775c4d38f61c"
+                S3ObjectVersion: "Pc5Cde.4rQu6L5ALmkaQf6miccFHn5U8"
+            MemorySize: 128
+            Role: !Sub "arn:aws:iam::019820692062:role/service-role/search-photos-role-yw2ly1lk"
+            Runtime: "python3.9"
+            Timeout: 10
+            TracingConfig: 
+                Mode: "PassThrough"
+            EphemeralStorage: 
+                Size: 512
+
+    LambdaFunction2:
+        Type: "AWS::Lambda::Function"
+        DeletionPolicy: Retain
+        Properties:
+            Description: ""
+            FunctionName: !Sub "index-photos"
+            Handler: "lambda_function.lambda_handler"
+            Architectures: 
+              - "x86_64"
+            Code: 
+                S3Bucket: "prod-iad-c1-djusa-tasks"
+                S3Key: !Sub "/snapshots/019820692062/index-photos-f688242f-f22e-449c-8f81-e915d486fdcb"
+                S3ObjectVersion: "xP81CfTSnOmObrrzQ9IDtscz5hRW0SbI"
+            MemorySize: 128
+            Role: !Sub "arn:aws:iam::019820692062:role/service-role/index-photos-role-vhbjlg5c"
+            Runtime: "python3.9"
+            Timeout: 10
+            TracingConfig: 
+                Mode: "PassThrough"
+            EphemeralStorage: 
+                Size: 512
+
